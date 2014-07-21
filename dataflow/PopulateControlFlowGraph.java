@@ -17,8 +17,8 @@ import static dataflow.Statement.Type;
  */
 
 public class PopulateControlFlowGraph extends GJNoArguDepthFirst<String> {
-	private Map<String,Set<BasicBlock>> definition;	/* label definition to basic block mapping */
-	private Map<String,Set<BasicBlock>> usage;		/* label usage to basic block mapping */
+	private Map<String, Set<BasicBlock>> definition;	/* label definition to basic block mapping */
+	private Map<String, Set<BasicBlock>> usage;		/* label usage to basic block mapping */
 	private ControlFlowGraph cfg;
 	private Procedure procedure;
 	private BasicBlock block;
@@ -37,7 +37,7 @@ public class PopulateControlFlowGraph extends GJNoArguDepthFirst<String> {
 	 */
 	@Override
 	public String visit(NodeList n) throws Exception {
-		for (Enumeration<Node> e = n.elements(); e.hasMoreElements(); )
+		for(Enumeration<Node> e = n.elements(); e.hasMoreElements(); )
 			e.nextElement().accept(this);
 		return null;
 	}
@@ -47,7 +47,7 @@ public class PopulateControlFlowGraph extends GJNoArguDepthFirst<String> {
 	 */
 	@Override
 	public String visit(NodeListOptional n) throws Exception {
-		for (Enumeration<Node> e = n.elements(); e.hasMoreElements(); )
+		for(Enumeration<Node> e = n.elements(); e.hasMoreElements(); )
 			e.nextElement().accept(this);
 		return null;
 	}
@@ -57,9 +57,9 @@ public class PopulateControlFlowGraph extends GJNoArguDepthFirst<String> {
 	 */
 	@Override
 	public String visit(NodeOptional n) throws Exception {
-		if(n.present() && n.node instanceof Label){
+		if(n.present() && n.node instanceof Label) {
 			String label = cfg.getGlobalLabel(procedure.getName() + "_" + n.node.accept(this));
-			if(statement != null && statement.getType() != Type.JumpStmt) {
+			if(statement != null && statement.getType() != Type.JumpStmt && statement.getType() != Type.CJumpStmt) {
 				/* new basic block */
 				BasicBlock block = new BasicBlock(blockCount++);
 				procedure.addBlock(block);
@@ -67,7 +67,7 @@ public class PopulateControlFlowGraph extends GJNoArguDepthFirst<String> {
 				this.block = block;
 			}
 			if(!definition.containsKey(label))
-				definition.put(label,new HashSet<BasicBlock>());
+				definition.put(label, new HashSet<BasicBlock>());
 			definition.get(label).add(block);
 		}
 		return n.present() ? n.node.accept(this) : null;
@@ -79,7 +79,7 @@ public class PopulateControlFlowGraph extends GJNoArguDepthFirst<String> {
 	 */
 	@Override
 	public String visit(NodeSequence n) throws Exception {
-		for (Enumeration<Node> e = n.elements(); e.hasMoreElements(); )
+		for(Enumeration<Node> e = n.elements(); e.hasMoreElements(); )
 			e.nextElement().accept(this);
 		return null;
 	}
@@ -160,13 +160,13 @@ public class PopulateControlFlowGraph extends GJNoArguDepthFirst<String> {
 	/**
 	 * Grammar production:
 	 * f0 -> NoOpStmt()
-	 *       | ErrorStmt()
-	 *       | CJumpStmt()
-	 *       | JumpStmt()
-	 *       | HStoreStmt()
-	 *       | HLoadStmt()
-	 *       | MoveStmt()
-	 *       | PrintStmt()
+	 * | ErrorStmt()
+	 * | CJumpStmt()
+	 * | JumpStmt()
+	 * | HStoreStmt()
+	 * | HLoadStmt()
+	 * | MoveStmt()
+	 * | PrintStmt()
 	 */
 	@Override
 	public String visit(Stmt n) throws Exception {
@@ -208,7 +208,7 @@ public class PopulateControlFlowGraph extends GJNoArguDepthFirst<String> {
 		statement.use.add(n.f1.accept(this));
 		String label = cfg.getGlobalLabel(procedure.getName() + "_" + n.f2.f0.tokenImage);
 		if(!usage.containsKey(label))
-			usage.put(label,new HashSet<BasicBlock>());
+			usage.put(label, new HashSet<BasicBlock>());
 
 		/* new basic block */
 		BasicBlock block = new BasicBlock(blockCount++);
@@ -229,7 +229,7 @@ public class PopulateControlFlowGraph extends GJNoArguDepthFirst<String> {
 		statement.setType(Type.JumpStmt);
 		String label = cfg.getGlobalLabel(procedure.getName() + "_" + n.f1.f0.tokenImage);
 		if(!usage.containsKey(label))
-			usage.put(label,new HashSet<BasicBlock>());
+			usage.put(label, new HashSet<BasicBlock>());
 
 		/* new basic block */
 		BasicBlock block = new BasicBlock(blockCount++);
@@ -249,7 +249,7 @@ public class PopulateControlFlowGraph extends GJNoArguDepthFirst<String> {
 	@Override
 	public String visit(HStoreStmt n) throws Exception {
 		statement.setType(Type.HStoreStmt);
-		statement.def.add(n.f1.accept(this));
+		statement.use.add(n.f1.accept(this));
 		statement.use.add(n.f3.accept(this));
 		return null;
 	}
@@ -279,6 +279,9 @@ public class PopulateControlFlowGraph extends GJNoArguDepthFirst<String> {
 	public String visit(MoveStmt n) throws Exception {
 		statement.setType(Type.MoveStmt);
 		statement.def.add(n.f1.accept(this));
+		//Move register1 Call register2 , where register1 is dead below
+		if(n.f2.f0.choice instanceof Call)
+			statement.use.add(n.f1.accept(this));
 		n.f2.accept(this);
 		return null;
 	}
@@ -298,9 +301,9 @@ public class PopulateControlFlowGraph extends GJNoArguDepthFirst<String> {
 	/**
 	 * Grammar production:
 	 * f0 -> Call()
-	 *       | HAllocate()
-	 *       | BinOp()
-	 *       | SimpleExp()
+	 * | HAllocate()
+	 * | BinOp()
+	 * | SimpleExp()
 	 */
 	@Override
 	public String visit(Exp n) throws Exception {
@@ -336,6 +339,7 @@ public class PopulateControlFlowGraph extends GJNoArguDepthFirst<String> {
 	 */
 	@Override
 	public String visit(Call n) throws Exception {
+		statement.setCall();
 		if(procedure.getMaxArguments() < n.f3.size())
 			procedure.setMaxArguments(n.f3.size());
 		n.f1.accept(this);
@@ -372,9 +376,9 @@ public class PopulateControlFlowGraph extends GJNoArguDepthFirst<String> {
 	/**
 	 * Grammar production:
 	 * f0 -> "LT"
-	 *       | "PLUS"
-	 *       | "MINUS"
-	 *       | "TIMES"
+	 * | "PLUS"
+	 * | "MINUS"
+	 * | "TIMES"
 	 */
 	@Override
 	public String visit(Operator n) throws Exception {
@@ -384,8 +388,8 @@ public class PopulateControlFlowGraph extends GJNoArguDepthFirst<String> {
 	/**
 	 * Grammar production:
 	 * f0 -> Temp()
-	 *       | IntegerLiteral()
-	 *       | Label()
+	 * | IntegerLiteral()
+	 * | Label()
 	 */
 	@Override
 	public String visit(SimpleExp n) throws Exception {
@@ -401,7 +405,7 @@ public class PopulateControlFlowGraph extends GJNoArguDepthFirst<String> {
 	 */
 	@Override
 	public String visit(Temp n) throws Exception {
-		return String.format("TEMP %s",n.f1.f0.tokenImage);
+		return String.format("TEMP %s", n.f1.f0.tokenImage);
 	}
 
 	/**

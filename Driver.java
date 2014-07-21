@@ -18,35 +18,33 @@ public class Driver {
 	private static FileInputStream stream = null;
 	private static SpigletParser parser;
 	private static Goal tree;
-	private static String target,kanga;
+	private static String target, kanga;
 	private static int dotIndex;
 	private static PrintWriter out;
 	private static ControlFlowGraph cfg;
 
 	public static void main(String[] args) {
-		for(String arg : args){
+		for(String arg : args) {
 			try {
 				System.out.println("Trying \'" + arg + "\' ...");
 				if((dotIndex = arg.lastIndexOf(".spg")) == -1)
 					throw new MyException("invalid file type, \'.spg\' expected.");
 
-				target = arg.substring(0, dotIndex)+".kg";
-				System.out.println("Output set to \'"+target+"\'.");
+				target = arg.substring(0, dotIndex) + ".kg";
+				System.out.println("Output set to \'" + target + "\'.");
 				stream = new FileInputStream(arg);
 				parser = new SpigletParser(stream);
 				tree = parser.Goal();
 				cfg = new ControlFlowGraph();
 				tree.accept(new PopulateControlFlowGraph(cfg));
 				cfg.compute();
-//				kanga = tree.accept(new KangaTranslator(cfg));
-//				System.out.println(kanga);
+				kanga = tree.accept(new KangaTranslator(cfg));
+				System.out.println(kanga);
 
-//				out = new PrintWriter(target);
-//				spiglet = tree.accept(new SpigletVisitor(nextAvailableRegister));
-//				//System.out.println(spiglet);
-//				out.print(kanga);
-//				out.flush();
-//				out.close();
+				out = new PrintWriter(target);
+				out.print(kanga);
+				out.flush();
+				out.close();
 
 			} catch (FileNotFoundException e) {
 				System.err.println(e.getMessage());

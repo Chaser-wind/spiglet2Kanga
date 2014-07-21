@@ -1,6 +1,9 @@
 package dataflow;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import static sets.Sets.*;
 
@@ -23,6 +26,10 @@ public final class BasicBlock {
 
 	public void addStatement(Statement statement){
 		statements.add(statement);
+	}
+
+	public Statement getStatement(int statement) {
+		return statements.get(statement);
 	}
 
 	public void addSuccessor(BasicBlock successor){
@@ -58,6 +65,21 @@ public final class BasicBlock {
 		this.in = new HashSet<String>(statements.get(firstStatementIndex).in);
 		this.out = new HashSet<String>(statements.get(lastStatementIndex).out);
 		return differ(out,outCopy);
+	}
+
+	/**
+	 * todo: intergrate this to liveness analysis algorithm... -- unused
+	 * marks dead statements
+	 */
+	private boolean filterStatements() {
+		boolean changed = false;
+		for(Statement statement : statements)
+			for(String def : statement.def)
+				if(statement.getState() != Statement.State.Dead && !statement.out.contains(def)) {
+					statement.setState(Statement.State.Dead);
+					changed = true;
+				}
+		return changed;
 	}
 
 	@Override
